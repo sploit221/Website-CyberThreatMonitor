@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card p-3 text-center h-100 d-flex flex-column justify-content-center">
+            <h5 class="dashboard-label">Status Keamanan</h5>
+            <h3 id="statusText" class="text-status-warning mb-0">Memuat...</h3>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-3">
+        <div class="card p-3 text-center h-100 d-flex flex-column justify-content-center">
+            <h5 class="dashboard-label">Waktu Lokal</h5>
+            <h3 id="liveClock" class="text-clock mb-0">00:00:00</h3>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card p-3 border-warning bg-dark text-white">
+            <h5 class="text-warning mb-3">
+                <i class="fa-solid fa-brain me-2"></i>AI Predictive Intelligence (Analisis Pola Selanjutnya)
+            </h5>
+            <div class="row text-center">
+                <div class="col-md-4 mb-2">
+                    <p class="text-secondary mb-1">Prediksi Jenis Serangan Next</p>
+                    <h4 id="predPola" class="text-info font-weight-bold">-</h4>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <p class="text-secondary mb-1">Target Port Selanjutnya</p>
+                    <h4 id="predPort" class="text-success font-weight-bold">-</h4>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <p class="text-secondary mb-1">Status Tingkat Ancaman</p>
+                    <h4 id="predRisiko" class="text-danger font-weight-bold">-</h4>
+                </div>
+            </div>
+            <hr class="bg-secondary my-2">
+            <p class="mb-0 text-muted">
+                <strong>Rekomendasi Respons:</strong> <span id="predRekomendasi" class="text-warning">-</span>
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="text-neon mb-3">
+            <i class="fa-solid fa-satellite-dish me-2"></i>Live Traffic Monitoring
+        </h2>
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <p class="text-secondary mb-0">Grafik pergerakan Anomaly Score secara real-time.</p>
+            <button id="btnDemo" class="btn btn-outline-warning">
+                <i class="fa-solid fa-play me-2"></i>Mulai Demo Expo
+            </button>
+        </div>
+        
+        <div class="card p-4 chart-container">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
+<script>
+
+    function updateClock() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('id-ID', { hour12: false });
+        
+        const clockElement = document.getElementById('liveClock');
+        if (clockElement) {
+            clockElement.innerText = timeString;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        let demoInterval = null;
+        let currentDataIndex = 0;
+        let csvData = [];
+        const btnDemo = document.getElementById('btnDemo');
+
+        // 1. Fetch data CSV dari folder static Flask
+        fetch("{{ url_for('static', filename='cybersecurity_attacks.csv') }}")
+            .then(response => response.text())
+            .then(text => {
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                const headers = lines[0].split(',');
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',');
+                    let rowObj = {};
+                    headers.forEach((header, index) => {
+                        let cleanHeader = header.trim().replace(/^"|"$/g, '');
+                        let cleanValue = values[index] ? values[index].trim().replace(/^"|"$/g, '') : '';
+                        rowObj[cleanHeader] = cleanValue;
+                    });
+                    csvData.push(rowObj);
+                }
+                console.log("Dataset CSV berhasil dimuat! Total data:", csvData.length);
+            })
+            .catch(err => console.error("Gagal memuat CSV. Pastikan file ada di folder 'static'. Error:", err));
+
+        // 2. Logika Jalannya Demo (Mulai/Stop)
+        if (btnDemo) {
+            btnDemo.addEventListener('click', function() {
+                if (this.innerText.includes('Mulai')) {
+                    // --- Mode: MULAI DEMO (Start) ---
+                    this.innerHTML = '<i class="fa-solid fa-stop me-2"></i>Hentikan Demo';
+                    this.classList.replace('btn-outline-warning', 'btn-danger');
+                    document.getElementById('statusText').innerText = "Menganalisis...";
+                    
+                    if (demoInterval) clearInterval(demoInterval);
+
+                    demoInterval = setInterval(() => {
+                        if (csvData.length === 0) {
+                            console.warn("Menunggu data CSV dimuat...");
+                            return;
+                        }
+                        if (currentDataIndex >= csvData.length) {
+                            console.log("Semua baris CSV sudah selesai diproses.");
+                            clearInterval(demoInterval);
+                            demoInterval = null;
+                            document.getElementById('btnDemo').innerHTML = '<i class="fa-solid fa-play me-2"></i>Mulai Demo Expo';
+                            document.getElementById('btnDemo').classList.replace('btn-danger', 'btn-outline-warning');
+                            return;
+                        }
+
+                        // Ambil baris aktif dari array data CSV
+                        let currentRow = csvData[currentDataIndex];
+                        let currentAnomalyScore = parseFloat(currentRow['anomaly_scores'] || currentRow['Anomaly Scores'] || 0);
+
+                        // Ambil koordinat lokasi secara aman (antisipasi jika ipapi terkena limit request)
+                        fetch('https://ipapi.co/json/')
+                            .then(response => response.ok ? response.json() : {})
+                            .catch(() => ({})) // Jika API lokasi down, kirim objek kosong agar skrip tidak patah
+                            .then(geoData => {
+                                
+                                // Struktur Payload JSON (Harus sinkron dengan request.get_json() di app.py)
+                                const payloadData = {
+                                    packet_length: parseFloat(currentRow['packet_length'] || currentRow['Packet Length'] || 0),
+                                    anomaly_scores: currentAnomalyScore,
+                                    source_port: parseInt(currentRow['source_port'] || currentRow['Source Port'] || 0),
+                                    destination_port: parseInt(currentRow['destination_port'] || currentRow['Destination Port'] || 0),
+                                    latitude: geoData.latitude || 0,
+                                    longitude: geoData.longitude || 0,
+                                    country: geoData.country_name || "Unknown",
+                                    attack_type: currentRow['Attack Type'] || currentRow['attack_type'] || 'Unknown'
+                                };
+
+                                // Kirim data ke Flask Backend dengan Method POST JSON
+                                return fetch('/predict', { 
+                                    method: 'POST', 
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify(payloadData) 
+                                });
+                            })
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error("Server merespon dengan status " + response.status);
+                                }
+                                return response.json();
+                            })
+
+                            .then(data => {
+                                let finalScore = 0;
+                            
+                                // 1. Ambil skor anomali aktual dari backend
+                                if (data && data.anomaly_score !== undefined) {
+                                    finalScore = parseFloat(data.anomaly_score);
+                                } 
+
+                                // 2. LOGIKA DEMO EXPO: Paksa kurva naik/turun tajam agar visual terlihat jelas
+                                if (data.is_attack === 1) {
+                                    // Jika serangan terdeteksi, paksa skor melonjak tajam (85 - 100)
+                                    if (finalScore < 70) {
+                                        finalScore = Math.floor(Math.random() * 16) + 85; 
+                                    }
+                                } else {
+                                    // Jika jaringan aman, paksa skor turun drastis membentuk riak kecil (5 - 15)
+                                    finalScore = Math.floor(Math.random() * 11) + 5;
+                                }
+
+                                // Update grafik menggunakan real data dari CSV aktif (Bukan variabel acak/undefined)
+                                if(typeof window.updateChartData === 'function') {
+                                    window.updateChartData(currentAnomalyScore);
+                                }
+                                
+                                // Sinkronisasi status text/suara dari script.js global
+                                if(typeof window.updateStatus === 'function') {
+                                    window.updateStatus();
+                                }
+
+                                fetch('/api/analyze_pola')
+                                    .then(res => res.json())
+                                    .then(analysis => {
+                                        if (analysis.status === 'analyzed') {
+                                            document.getElementById('predPola').innerText = analysis.predicted_attack;
+                                            document.getElementById('predPort').innerText = analysis.predicted_port;
+                                            document.getElementById('predRisiko').innerText = analysis.risk_level;
+                                            document.getElementById('predRekomendasi').innerText = analysis.recommendation;
+                                        } else if (analysis.status === 'waiting') {
+                                            document.getElementById('predPola').innerText = "Mengumpulkan data...";
+                                            document.getElementById('predRekomendasi').innerText = analysis.message;
+                                        }
+                                    })
+                                    .catch(err => console.error("Gagal memuat prediksi pola:", err));
+                            })
+                            .catch(err => console.error("Gagal memproses data /predict:", err));
+                        
+                        currentDataIndex++;
+
+                    }, 4000); // Interval pengiriman data setiap 4 detik
+                } else {
+                    // --- Mode: BERHENTI DEMO (Stop) ---
+                    this.innerHTML = '<i class="fa-solid fa-play me-2"></i>Mulai Demo Expo';
+                    this.classList.replace('btn-danger', 'btn-outline-warning');
+                    
+                    clearInterval(demoInterval);
+                    demoInterval = null;
+                    document.getElementById('statusText').innerText = "Demo Berhenti";
+                }
+            });
+        }
+    });
+</script>
+
+{% endblock %}

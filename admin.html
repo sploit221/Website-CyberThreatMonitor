@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4" id="area-cetak">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="text-success fw-bold"><i class="fa-solid fa-user-shield me-2"></i>Admin Threat Dashboard</h1>
+            <p class="text-secondary">Informasi real-time pengguna yang mengakses sistem dan status analisis ancaman.</p>
+        </div>
+        <div class="d-flex gap-2" id="grup-tombol-aksi">
+            <a href="/admin/export/excel" class="btn btn-outline-success">
+                <i class="fa-solid fa-file-excel me-1"></i> Excel
+            </a>
+            <a href="/admin/export/pdf" class="btn btn-outline-danger">
+                <i class="fa-solid fa-file-pdf me-1"></i> PDF
+            </a>
+            <button onclick="window.location.reload();" class="btn btn-outline-secondary">
+                <i class="fa-solid fa-rotate me-1"></i> Refresh Data
+            </button>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card bg-dark border-secondary p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted text-uppercase small">Total Aktivitas Terekam</h6>
+                        <h2 class="text-white fw-bold mb-0">{{ total_logs }}</h2>
+                    </div>
+                    <div class="bg-secondary bg-opacity-25 p-3 rounded text-secondary">
+                        <i class="fa-solid fa-chart-bar fa-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card bg-dark border-danger p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-danger text-uppercase small">Total Serangan Terdeteksi</h6>
+                        <h2 class="text-danger fw-bold mb-0">{{ total_attacks }}</h2>
+                    </div>
+                    <div class="bg-danger bg-opacity-10 p-3 rounded text-danger">
+                        <i class="fa-solid fa-skull-crossbones fa-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-dark border-secondary">
+        <div class="card-header bg-secondary bg-opacity-10 text-white fw-bold">
+            <i class="fa-solid fa-list me-2"></i>Riwayat Aktivitas Trafik Jaringan
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" id="tabel-log-container">
+                <table class="table table-dark table-hover mb-0 align-middle">
+                    <thead class="table-light text-uppercase font-monospace small">
+                        <tr class="text-secondary small text-uppercase border-secondary">
+                            <th class="ps-4">Waktu (WIB)</th>
+                            <th>Informasi Pengguna & Status</th>
+                            <th>Packet Length</th>
+                            <th>Anomaly Score</th>
+                            <th>Port (Src/Dst)</th>
+                            <th class="pe-4 text-center">Status Ancaman</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if logs %}
+                            {% for log in logs %}
+                            <tr class="border-secondary">
+                                <td class="ps-4 text-white font-monospace small">{{ log.waktu }}</td>
+                                <td>
+                                    <span class="text-info small">{{ log.status }}</span>
+                                </td>
+                                <td>{{ log.packet_length | int }} bytes</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">{{ log.anomaly_scores }}</span>
+                                        <div class="progress w-50" style="height: 6px;">
+                                            <div class="progress-bar {% if log.anomaly_scores > 50 %}bg-danger{% else %}bg-info{% endif %}" 
+                                                 style="width: {{ log.anomaly_scores }}%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="small">
+                                        <span class="text-muted">Src:</span> {{ log.source_port | int }} <br>
+                                        <span class="text-warning">Dst:</span> {{ log.destination_port | int }}
+                                    </div>
+                                </td>
+                                <td class="pe-4 text-center">
+                                    {% if log.is_attack == 1 %}
+                                        <span class="badge bg-danger px-3 py-2 text-uppercase">
+                                            <i class="fa-solid fa-skull-crossbones me-1"></i> Attack
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success px-3 py-2 text-uppercase">
+                                            <i class="fa-solid fa-shield me-1"></i> Safe
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <i class="fa-solid fa-folder-open d-block mb-3 fa-2xl"></i>
+                                    Belum ada data aktivitas yang tercatat.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+    document.getElementById('btnDownloadPDF').addEventListener('click', function () {
+        // PERBAIKAN 2: Tembak spesifik ID 'area-cetak', bukan class container
+        const element = document.getElementById('area-cetak');
+        
+        // Sembunyikan tombol
+        const actionButtons = document.getElementById('grup-tombol-aksi');
+        actionButtons.style.display = 'none';
+
+        // PERBAIKAN 3: Hilangkan sementara class pembungkus yang memicu error blank/potong
+        const tabelContainer = document.getElementById('tabel-log-container');
+        tabelContainer.classList.remove('table-responsive');
+
+        const opt = {
+            margin:       [10, 10, 10, 10],
+            filename:     'Laporan_Cyber_Threat_Logs.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0b1120' }, 
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' } 
+        };
+
+        // Render PDF
+        html2pdf().set(opt).from(element).save().then(() => {
+            // Kembalikan ke normal setelah selesai unduh
+            actionButtons.style.display = 'flex';
+            tabelContainer.classList.add('table-responsive');
+        });
+    });
+</script>
+{% endblock %}

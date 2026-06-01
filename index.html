@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row align-items-center mb-5">
+        <div class="col-lg-6">
+            <h1 class="display-4 fw-bold text-success">Cyber Threat Monitor</h1>
+            <p class="lead text-secondary">
+                Sistem monitoring keamanan jaringan berbasis Machine Learning. Deteksi dini serangan cyber dengan akurasi tinggi dan visualisasi data real-time.
+            </p>
+            <div class="mt-4">
+                <a href="/dashboard" class="btn btn-outline-success btn-lg me-3">Lihat Dashboard</a>
+                <a href="/predict" class="btn btn-primary btn-lg">Coba Prediksi</a>
+            </div>
+        </div>
+        <div class="col-lg-6 text-center">
+            <div class="p-5 bg-dark border border-success rounded">
+                <h3 class="text-white">Live Monitoring Active</h3>
+                <small class="text-muted" id="status-text">Status: Memuat...</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="row text-center mt-5">
+        <div class="col-md-4">
+            <div class="card bg-dark border-secondary p-3">
+                <h4 class="text-light">Real-time Analysis</h4>
+                <p class="text-secondary">Pantau trafik jaringan dan serangan secara langsung.</p>
+            </div>
+        </div>
+        </div>
+</div>
+
+<script>
+    // =========================================================================
+    // KODE BARU: FITUR SAMBUTAN SUARA IP USER
+    // =========================================================================
+    window.addEventListener('load', () => {
+        // 1. Ambil IP dari server Flask yang dikirim lewat render_template
+        let ipUser = "{{ user_ip }}";
+        
+        // Jika karena suatu alasan IP tidak terbaca, beri nilai default
+        if (!ipUser || ipUser === "None") {
+            ipUser = "tidak diketahui";
+        }
+
+        // 2. Ubah format titik agar enak dibaca oleh bot suara (misal: 192 titik 168)
+        let ipUntukSuara = ipUser.replace(/\./g, ' titik ');
+        
+        // 3. Siapkan kalimat sambutannya
+        let kalimatSambutan = "Selamat datang di Cyber Threat Monitor. IP user yang mengakses website adalah " + ipUntukSuara;
+        
+        // 4. Siapkan pengaturan suara
+        const utterance = new SpeechSynthesisUtterance(kalimatSambutan);
+        utterance.lang = 'id-ID'; // Logat bahasa Indonesia
+        utterance.rate = 0.9;     // Kecepatan baca sedikit diperlambat agar jelas
+
+        // 5. PERINTAH AUTOPLAY: Langsung mainkan saat halaman selesai dimuat
+        window.speechSynthesis.speak(utterance);
+
+        document.body.addEventListener('click', function playSuara() {
+            window.speechSynthesis.speak(utterance);
+            // Hapus event listener agar suara tidak berulang-ulang setiap kali layar diklik selanjutnya
+            document.body.removeEventListener('click', playSuara); 
+        }, { once: true });
+    });
+
+
+    // =========================================================================
+    // KODE LAMA: FITUR LIVE MONITORING & ALERT ANCAMAN (TIDAK BERUBAH)
+    // =========================================================================
+    let lastStatus = false; // Untuk melacak status sebelumnya agar alert tidak spam
+
+    function updateStatus() {
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('status-text').innerText = "Status: " + data.status;
+                
+                if(data.is_attack) {
+                    document.getElementById('status-text').className = "text-danger fw-bold";
+                    
+                    // Munculkan pop-up HANYA jika sebelumnya aman (menghindari spam)
+                    if (!lastStatus) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Ancaman Terdeteksi!',
+                            text: data.status,
+                            background: '#1e293b',
+                            color: '#f8fafc',
+                            confirmButtonColor: '#ef4444'
+                        });
+                    }
+                    lastStatus = true;
+                } else {
+                    document.getElementById('status-text').className = "text-muted";
+                    lastStatus = false;
+                }
+            })
+            .catch(error => console.error("Gagal memuat status:", error));
+    }
+
+    // Panggil langsung saat halaman dimuat
+    updateStatus();
+
+    // Jalankan pengecekan setiap 5 detik
+    setInterval(updateStatus, 5000);
+</script>
+{% endblock %}

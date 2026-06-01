@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card p-4 mb-4" style="background-color: #1e293b; border: 1px solid #334155;">
+                <h2 class="text-neon mb-4"><i class="bi bi-cpu-fill"></i> Analisis Prediksi Serangan</h2>
+                
+                <form method="POST" class="mt-2">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-bold">Packet Length</label>
+                        <input type="number" step="any" name="packet_length" placeholder="Contoh: 64.0" class="form-control bg-dark text-white border-secondary" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-bold">Anomaly Scores</label>
+                        <input type="number" step="any" name="anomaly_scores" placeholder="Contoh: 85.5" class="form-control bg-dark text-white border-secondary" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-bold">Source Port</label>
+                        <input type="number" step="any" name="source_port" placeholder="Contoh: 443" class="form-control bg-dark text-white border-secondary" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-bold">Destination Port</label>
+                        <input type="number" step="any" name="destination_port" placeholder="Contoh: 80" class="form-control bg-dark text-white border-secondary" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 btn-lg fw-bold mt-2">Prediksi Sekarang</button>
+                </form>
+            </div>
+
+            {% if prediction is not none and prediction != "" %}
+                {% if prediction == 'Attack' %}
+                    <div class="card p-4 border border-danger alert-danger-pulse text-center" style="background-color: #1a1015;">
+                        <h3 class="text-danger fw-bold mb-3">
+                            ⚠️ HASIL: ANCAMAN TERDETEKSI ({{ prediction }})
+                        </h3>
+                        <h5 class="text-light mb-0">
+                            Tingkat Keyakinan Model: 
+                            <span class="text-danger fw-bold">{{ (confidence * 100) | round(2) }}%</span>
+                        </h5>
+                    </div>
+                {% else %}
+                    <div class="card p-4 border border-success text-center" style="background-color: #0f1c15;">
+                        <h3 class="text-success fw-bold mb-3">
+                            ✅ HASIL: TRAFIK NORMAL / AMAN ({{ prediction }})
+                        </h3>
+                        <h5 class="text-light mb-0">
+                            Tingkat Keyakinan Model: 
+                            <span class="text-neon fw-bold">{{ (confidence * 100) | round(2) }}%</span>
+                        </h5>
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
